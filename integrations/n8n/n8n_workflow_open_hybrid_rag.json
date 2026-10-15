@@ -1,0 +1,132 @@
+{
+  "name": "Open Hybrid RAG - Universal Chat & Sync Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hybrid-chat-webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "id": "node-webhook-input",
+      "name": "Chat / Trigger Input"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/api/v1/orchestrate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.GATEWAY_API_KEY || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query: $json.body.query || $json.body.pregunta || $json.body.text, audit_assert: false } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "id": "node-orchestrate-request",
+      "name": "Open Hybrid RAG Gateway"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.telemetry.escalated_to_cloud }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "id": "node-if-escalated",
+      "name": "¿Escaló a la Nube?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'success', channel: 'cloud_escalation', answer: $json.answer, doc_id: $json.second_brain_doc_id, latency_ms: $json.telemetry.total_latency_ms, route: $json.route_taken } }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 220],
+      "id": "node-respond-cloud",
+      "name": "Responder (Vía Cloud)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'success', channel: $json.route_taken === 'LOCAL_ABSTENTION' ? 'privacy_abstention' : 'local_resolution', answer: $json.answer, doc_id: $json.second_brain_doc_id, latency_ms: $json.telemetry.total_latency_ms, score: $json.similarity_score, route: $json.route_taken } }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [920, 380],
+      "id": "node-respond-local",
+      "name": "Responder (Vía Local / Caché)"
+    }
+  ],
+  "connections": {
+    "Chat / Trigger Input": {
+      "main": [
+        [
+          {
+            "node": "Open Hybrid RAG Gateway",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Hybrid RAG Gateway": {
+      "main": [
+        [
+          {
+            "node": "¿Escaló a la Nube?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Escaló a la Nube?": {
+      "main": [
+        [
+          {
+            "node": "Responder (Vía Cloud)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder (Vía Local / Caché)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

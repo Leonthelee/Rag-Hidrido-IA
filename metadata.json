@@ -1,0 +1,7 @@
+{
+  "name": "Open Hybrid RAG Gateway",
+  "description": "Universal Local-First AI Orchestrator with True Hybrid RAG (Dense + BM25 + RRF), Perimeter Security & Spec-Driven Evaluation",
+  "version": "1.3.0",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
